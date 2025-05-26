@@ -1,0 +1,2 @@
+pip install --proxy http://127.0.0.1:9000/localproxy-<yourid>.pac --trusted-host=pypi.org --trusted-host=files.pythonhosted.org --upgrade -r requirements.txt 
+ 
