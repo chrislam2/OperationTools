@@ -29,9 +29,12 @@ staff_id = os.getlogin()
 cUser = os.path.expanduser('~')
 current_directory = os.path.dirname(os.path.realpath(__file__))
 previous_directory = os.path.abspath(os.path.join(current_directory, os.pardir))
+temp_directory = "C:\\temp"
 
 now = datetime.datetime.now()
 today = datetime.datetime.today()
+now_string = now.strftime("%Y%m%d%H%M%S")
+today_string = today.strftime("%Y%m%d")
 
 driver_path = os.path.join(current_directory, "msedgedriver.exe")
 
@@ -45,16 +48,14 @@ def delete_version_history(driver, url_path):
     driver.get(url_path)
     try:
         delete_version_button_element = driver.find_element(By.XPATH, '//a[@id="ctl00_PlaceHolderMain_MngVersionToolBar_RptControls_diidDeleteVersions_LinkText"]')
-    except NoSuchElementException as e:
-        print(e)
-    try:
         delete_version_button_element.click()
         time.sleep(0.2)
         alert = driver.switch_to.alert
         alert.accept()
         time.sleep(0.3)
-    except StaleElementReferenceException as e:
-        print("StaleElementReferenceException occurred. Continue.")
+    except Exception as e:
+        print(e)
+        print("Exception do not cause a fatal error. Continue.")
 
     # Return to the previous directory
     driver.get(current_url_path)
@@ -89,10 +90,14 @@ def scan_directory(driver, url_path, return_url_path, scan_inner_directory_bool 
                     inner_directory_tensor = scan_directory(driver, directory_link, url_path)
                     directory_tensor.append(inner_directory_tensor)
             else:
-                version_button_link = version_button_element.get_attribute('href')
-                print("Deleting the version history for: " + version_button_link)
-                directory_tensor.append(file_name_element.text)
-                delete_version_history(driver, version_button_link)
+                try:
+                    version_button_link = version_button_element.get_attribute('href')
+                    print("Deleting the version history for: " + version_button_link)
+                    directory_tensor.append(file_name_element.text)
+                    delete_version_history(driver, version_button_link)
+                except Exception as e:
+                    print(e)
+                    print("Exception do not cause a fatal error. Continue.")
     except NoSuchElementException:
         print("Reach the end at line: " + str(i))
     
@@ -141,15 +146,29 @@ while True:
     else:
         print("Make sure you input Y or N. Try again.")
 
-# Get Driver
 try:
-    driver = webdriver.Edge()
-except Exception as e:
-    driver = webdriver.Edge(service=Service(driver_path))
-driver.maximize_window()
+    # Get Driver
+    try:
+        driver = webdriver.Edge()
+    except Exception as e:
+        driver = webdriver.Edge(service=Service(driver_path))
+    driver.maximize_window()
 
-# Process the deletion
-driver.get(root_directory_url_path)
-directory_tensor = scan_directory(driver, root_directory_url_path, driver.current_url, scan_inner_directory_bool)
-print("The directory structure is: ")
-print(directory_tensor)
+    # Process the deletion
+    driver.get(root_directory_url_path)
+    directory_tensor = scan_directory(driver, root_directory_url_path, driver.current_url, scan_inner_directory_bool)
+    print("The directory structure is: ")
+    print(directory_tensor)
+except Exception as e:
+    now_string_formatted = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print("Sending Email - Clear Version History in Storage Metrices Failed (" + now_string_formatted + ")")
+    outlook = win32.Dispatch('outlook.application')
+    mail = outlook.CreateItem(0)
+    mail.To = 'chris.cm.lam@clp.com.hk;'
+    mail.Subject = 'Clear Version History in Storage Metrices Failed (' + now_string_formatted + ')'
+    mail.HTMLBody = '<html><body>' + \
+                    '<p>Hi,<br><br>Encountered failure to clear version history at: ' + root_directory_url_path + '</p>' + \
+                    '<p>Error Reason: ' + str(e) + '</p>' + \
+                    '<p>Regards,<br>SMP Team</p>' + \
+                    '</body></html>'
+    mail.Send()
